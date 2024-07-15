@@ -2152,6 +2152,7 @@ public class AvroDataTest {
                  avroData.toConnectData(avroSchema, record2Test));
   }
 
+
   @Test
   public void testToConnectUnionWithGeneralizedSumTypeSupport() {
     avroData = new AvroData(new AvroDataConfig.Builder()
@@ -2195,6 +2196,59 @@ public class AvroDataTest {
         avroData.toConnectData(avroSchema, record1Test));
     assertEquals(new SchemaAndValue(schema, schema2Test),
         avroData.toConnectData(avroSchema, record2Test));
+  }
+
+  @Test
+  public void testToConnectUnionEnums() {
+    avroData = new AvroData(new AvroDataConfig.Builder()
+            .with(AvroDataConfig.SCHEMAS_CACHE_SIZE_CONFIG, 2)
+            .with(AvroDataConfig.ENHANCED_AVRO_SCHEMA_SUPPORT_CONFIG, false)
+            .build());
+    org.apache.avro.Schema avroSchema = org.apache.avro.SchemaBuilder.builder().unionOf().enumeration("TestEnum")
+            .doc("some documentation")
+            .symbols("foo", "bar", "baz").and()
+            .intType()
+            .endUnion();
+
+    SchemaBuilder builder = SchemaBuilder.string().optional().name("TestEnum");
+
+    Schema schema = SchemaBuilder.struct()
+            .name("io.confluent.connect.avro.Union")
+            .field("TestEnum", builder.build())
+            .field("int", Schema.OPTIONAL_INT32_SCHEMA)
+            .build();
+    assertEquals(new SchemaAndValue(schema, new Struct(schema).put("TestEnum", "bar")),
+            avroData.toConnectData(avroSchema,  new GenericData.EnumSymbol(avroSchema.getTypes().get(0), "bar")));
+  }
+
+  @Test
+  public void testToConnectUnionEnumsWithEnhanced() {
+    avroData = new AvroData(new AvroDataConfig.Builder()
+            .with(AvroDataConfig.SCHEMAS_CACHE_SIZE_CONFIG, 2)
+            .with(AvroDataConfig.ENHANCED_AVRO_SCHEMA_SUPPORT_CONFIG, true)
+            .build());
+    org.apache.avro.Schema avroSchema = org.apache.avro.SchemaBuilder.builder().unionOf().enumeration("TestEnum")
+            .doc("some documentation")
+            .symbols("foo", "bar", "baz").and()
+            .stringType()
+            .endUnion();
+
+    SchemaBuilder builder = SchemaBuilder.string().optional().name("TestEnum");
+    builder.parameter(AVRO_ENUM_DOC_PREFIX_PROP + "TestEnum", "some documentation");
+    builder.parameter(AVRO_TYPE_ENUM, "TestEnum");
+    for(String enumSymbol : new String[]{"foo", "bar", "baz"}) {
+      builder.parameter(AVRO_TYPE_ENUM+"."+enumSymbol, enumSymbol);
+    };
+
+    Schema schema = SchemaBuilder.struct()
+            .name("io.confluent.connect.avro.Union")
+            .field("TestEnum", builder.build())
+            .field("string", Schema.OPTIONAL_STRING_SCHEMA)
+            .build();
+    assertEquals(new SchemaAndValue(schema, new Struct(schema).put("TestEnum", "bar")),
+            avroData.toConnectData(avroSchema,  new GenericData.EnumSymbol(avroSchema.getTypes().get(0), "bar")));
+    assertEquals(new SchemaAndValue(schema, new Struct(schema).put("string", "teststring")),
+            avroData.toConnectData(avroSchema, "teststring"));
   }
 
   @Test(expected = DataException.class)

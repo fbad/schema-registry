@@ -2227,6 +2227,9 @@ public class AvroData {
         return splitName(schema.name())[1];
       }
     }
+    if (!enhancedSchemaSupport && schema.name() != null) {
+      return splitName(schema.name())[1];
+    }
     return CONNECT_TYPES_TO_AVRO_TYPES.get(schema.type()).getName();
   }
 
@@ -2264,12 +2267,16 @@ public class AvroData {
     if (classes == null) {
       return false;
     }
+    if (!enhancedSchemaSupport && (value instanceof GenericEnumSymbol
+            || value instanceof Enum)) {
+      value = value.toString();
+    }
     for (Class type : classes) {
       if (type.isInstance(value)) {
         if (isFixedSchema(fieldSchema)) {
           if (fixedValueSizeMatch(fieldSchema, value,
-              Integer.parseInt(fieldSchema.parameters().get(CONNECT_AVRO_FIXED_SIZE_PROP)),
-              index)) {
+                  Integer.parseInt(fieldSchema.parameters().get(CONNECT_AVRO_FIXED_SIZE_PROP)),
+                  index)) {
             return true;
           }
         } else {
