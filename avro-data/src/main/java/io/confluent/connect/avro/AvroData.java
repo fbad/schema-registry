@@ -1896,28 +1896,30 @@ public class AvroData {
       case ENUM:
         // enums are unwrapped to strings and the original enum is not preserved
         builder = SchemaBuilder.string();
-        if (connectMetaData) {
-          if (schema.getDoc() != null) {
-            builder.parameter(discardTypeDocDefault
-                ? CONNECT_ENUM_DOC_PROP
-                : AVRO_ENUM_DOC_PREFIX_PROP + schema.getName(),
-                schema.getDoc());
+        if (generalizedSumTypeSupport || enhancedSchemaSupport) {
+          if (connectMetaData) {
+            if (schema.getDoc() != null) {
+              builder.parameter(discardTypeDocDefault
+                              ? CONNECT_ENUM_DOC_PROP
+                              : AVRO_ENUM_DOC_PREFIX_PROP + schema.getName(),
+                      schema.getDoc());
+            }
+            if (!discardTypeDocDefault && schema.getEnumDefault() != null) {
+              builder.parameter(AVRO_ENUM_DEFAULT_PREFIX_PROP + schema.getName(),
+                      schema.getEnumDefault());
+            }
           }
-          if (!discardTypeDocDefault && schema.getEnumDefault() != null) {
-            builder.parameter(AVRO_ENUM_DEFAULT_PREFIX_PROP + schema.getName(),
-                schema.getEnumDefault());
+          String paramName = generalizedSumTypeSupport ? GENERALIZED_TYPE_ENUM : AVRO_TYPE_ENUM;
+          builder.parameter(paramName, schema.getFullName());
+          int symbolIndex = 0;
+          for (String enumSymbol : schema.getEnumSymbols()) {
+            if (generalizedSumTypeSupport) {
+              builder.parameter(paramName + "." + enumSymbol, String.valueOf(symbolIndex));
+            } else {
+              builder.parameter(paramName + "." + enumSymbol, enumSymbol);
+            }
+            symbolIndex++;
           }
-        }
-        String paramName = generalizedSumTypeSupport ? GENERALIZED_TYPE_ENUM : AVRO_TYPE_ENUM;
-        builder.parameter(paramName, schema.getFullName());
-        int symbolIndex = 0;
-        for (String enumSymbol : schema.getEnumSymbols()) {
-          if (generalizedSumTypeSupport) {
-            builder.parameter(paramName + "." + enumSymbol, String.valueOf(symbolIndex));
-          } else {
-            builder.parameter(paramName + "." + enumSymbol, enumSymbol);
-          }
-          symbolIndex++;
         }
         break;
 
@@ -2281,6 +2283,9 @@ public class AvroData {
         return splitName(schema.name())[1];
       }
     }
+    if (!enhancedSchemaSupport && schema.name() != null) {
+      return splitName(schema.name())[1];
+    }
     return CONNECT_TYPES_TO_AVRO_TYPES.get(schema.type()).getName();
   }
 
@@ -2318,12 +2323,16 @@ public class AvroData {
     if (classes == null) {
       return false;
     }
+    if (!enhancedSchemaSupport && (value instanceof GenericEnumSymbol
+            || value instanceof Enum)) {
+      value = value.toString();
+    }
     for (Class type : classes) {
       if (type.isInstance(value)) {
         if (isFixedSchema(fieldSchema)) {
           if (fixedValueSizeMatch(fieldSchema, value,
-              Integer.parseInt(fieldSchema.parameters().get(CONNECT_AVRO_FIXED_SIZE_PROP)),
-              index)) {
+                  Integer.parseInt(fieldSchema.parameters().get(CONNECT_AVRO_FIXED_SIZE_PROP)),
+                  index)) {
             return true;
           }
         } else {
