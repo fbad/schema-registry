@@ -1847,28 +1847,30 @@ public class AvroData {
       case ENUM:
         // enums are unwrapped to strings and the original enum is not preserved
         builder = SchemaBuilder.string();
-        if (connectMetaData) {
-          if (schema.getDoc() != null) {
-            builder.parameter(discardTypeDocDefault
-                ? CONNECT_ENUM_DOC_PROP
-                : AVRO_ENUM_DOC_PREFIX_PROP + schema.getName(),
-                schema.getDoc());
+        if (generalizedSumTypeSupport || enhancedSchemaSupport) {
+          if (connectMetaData) {
+            if (schema.getDoc() != null) {
+              builder.parameter(discardTypeDocDefault
+                              ? CONNECT_ENUM_DOC_PROP
+                              : AVRO_ENUM_DOC_PREFIX_PROP + schema.getName(),
+                      schema.getDoc());
+            }
+            if (!discardTypeDocDefault && schema.getEnumDefault() != null) {
+              builder.parameter(AVRO_ENUM_DEFAULT_PREFIX_PROP + schema.getName(),
+                      schema.getEnumDefault());
+            }
           }
-          if (!discardTypeDocDefault && schema.getEnumDefault() != null) {
-            builder.parameter(AVRO_ENUM_DEFAULT_PREFIX_PROP + schema.getName(),
-                schema.getEnumDefault());
+          String paramName = generalizedSumTypeSupport ? GENERALIZED_TYPE_ENUM : AVRO_TYPE_ENUM;
+          builder.parameter(paramName, schema.getFullName());
+          int symbolIndex = 0;
+          for (String enumSymbol : schema.getEnumSymbols()) {
+            if (generalizedSumTypeSupport) {
+              builder.parameter(paramName + "." + enumSymbol, String.valueOf(symbolIndex));
+            } else {
+              builder.parameter(paramName + "." + enumSymbol, enumSymbol);
+            }
+            symbolIndex++;
           }
-        }
-        String paramName = generalizedSumTypeSupport ? GENERALIZED_TYPE_ENUM : AVRO_TYPE_ENUM;
-        builder.parameter(paramName, schema.getFullName());
-        int symbolIndex = 0;
-        for (String enumSymbol : schema.getEnumSymbols()) {
-          if (generalizedSumTypeSupport) {
-            builder.parameter(paramName + "." + enumSymbol, String.valueOf(symbolIndex));
-          } else {
-            builder.parameter(paramName + "." + enumSymbol, enumSymbol);
-          }
-          symbolIndex++;
         }
         break;
 

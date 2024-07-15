@@ -2259,7 +2259,11 @@ public class AvroDataTest {
 
   @Test
   public void testToConnectEnum() {
-    // Enums are just converted to strings, original enum is preserved in parameters
+    AvroDataConfig avroDataConfig = new AvroDataConfig.Builder()
+            .with(AvroDataConfig.ENHANCED_AVRO_SCHEMA_SUPPORT_CONFIG, true)
+            .build();
+    AvroData avroData = new AvroData(avroDataConfig);
+    // Enums are just converted to strings, original enum is preserved in parameters only if enhanced schema support is enabled
     org.apache.avro.Schema avroSchema = org.apache.avro.SchemaBuilder.builder()
         .enumeration("TestEnum")
         .doc("some documentation")
@@ -2279,6 +2283,10 @@ public class AvroDataTest {
 
   @Test
   public void testToConnectEnumWithNoDoc() {
+    AvroDataConfig avroDataConfig = new AvroDataConfig.Builder()
+            .with(AvroDataConfig.ENHANCED_AVRO_SCHEMA_SUPPORT_CONFIG, true)
+            .build();
+    AvroData avroData = new AvroData(avroDataConfig);
     // Enums are just converted to strings, original enum is preserved in parameters
     org.apache.avro.Schema avroSchema = org.apache.avro.SchemaBuilder.builder()
             .enumeration("TestEnum")
@@ -2288,6 +2296,21 @@ public class AvroDataTest {
     for(String enumSymbol : new String[]{"foo", "bar", "baz"}) {
       builder.parameter(AVRO_TYPE_ENUM+"."+enumSymbol, enumSymbol);
     }
+
+    assertEquals(new SchemaAndValue(builder.build(), "bar"),
+            avroData.toConnectData(avroSchema, "bar"));
+    assertEquals(new SchemaAndValue(builder.build(), "bar"),
+            avroData.toConnectData(avroSchema, new GenericData.EnumSymbol(avroSchema, "bar")));
+  }
+
+  @Test
+  public void testToConnectEnumWithNoEnhancedAvroSchemaSupport() {
+    // Enums are just converted to strings, original enum is preserved in parameters only if enhanced schema support is enabled
+    org.apache.avro.Schema avroSchema = org.apache.avro.SchemaBuilder.builder()
+            .enumeration("TestEnum")
+            .doc("some documentation")
+            .symbols("foo", "bar", "baz");
+    SchemaBuilder builder = SchemaBuilder.string().name("TestEnum");
 
     assertEquals(new SchemaAndValue(builder.build(), "bar"),
             avroData.toConnectData(avroSchema, "bar"));
